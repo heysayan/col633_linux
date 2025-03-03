@@ -76,6 +76,11 @@
 
 #include "uid16.h"
 
+/*For New features*/
+#include <linux/resource_tracker.h>
+#include <linux/pid.h>
+
+
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
 #endif
@@ -2791,3 +2796,56 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	return 0;
 }
 #endif /* CONFIG_COMPAT */
+
+
+/*Resource tracking feature*/
+LIST_HEAD(tracked_resources_list) ; // Initializes the monitored process linked list
+
+SYSCALL_DEFINE1(register,pid_t,pid){
+	if (pid<1) return -22;
+	struct pid_node *cur;
+	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+		if ((cur->proc_resource)->pid == pid) return -23;
+	}
+	struct pid *pid_struct_ = find_get_pid(pid);
+	if (!pid_struct_) return -3;
+	else {
+		struct per_proc_resource *p1 = kmalloc(sizeof(struct per_proc_resource),GFP_KERNEL);
+		if (!p1) return -ENOMEM;
+		p1->pid = pid;
+		p1->heapsize = 0; p1->openfile_count = 0;
+		struct pid_node *pn1 = kmalloc(sizeof(struct pid_node),GFP_KERNEL);
+		if (!pn1) {kfree(p1);return -ENOMEM;}
+		pn1->proc_resource = p1;
+		list_add(&(pn1->next_prev_list),&tracked_resources_list);
+		put_pid(pid_struct_);
+		return 0;
+	}
+
+}
+
+SYSCALL_DEFINE2(fetch,struct per_proc_resource __user *,stats,pid_t,pid){
+	struct pid_node *cur;
+	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+		if ((cur->proc_resource)->pid == pid){
+			if (copy_to_user(stats,cur->proc_resource, sizeof(struct per_proc_resource)))
+				return -22;
+			return 0;
+		}
+	}
+	return -22;
+}
+
+SYSCALL_DEFINE1(deregister,pid_t,pid){
+	if (pid<1) return -22;
+	struct pid_node *cur;
+	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+		if ((cur->proc_resource)->pid == pid){
+			kfree(cur->proc_resource);
+			list_del(&(cur->next_prev_list));
+			kfree(cur);
+			return 0;
+		}
+	}
+	return -3;
+}

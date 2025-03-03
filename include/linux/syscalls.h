@@ -86,6 +86,7 @@ enum landlock_rule_type;
 #include <linux/key.h>
 #include <linux/personality.h>
 #include <trace/syscall.h>
+#include <linux/resource_tracker.h>
 
 #ifdef CONFIG_ARCH_HAS_SYSCALL_WRAPPER
 /*
@@ -1385,4 +1386,10 @@ int __sys_getsockopt(int fd, int level, int optname, char __user *optval,
 		int __user *optlen);
 int __sys_setsockopt(int fd, int level, int optname, char __user *optval,
 		int optlen);
+
+
+// New features
+asmlinkage long sys_register(pid_t pid);
+asmlinkage long sys_fetch(struct proc_resource __user *stats, pid_t pid);
+asmlinkage long sys_deregister(pid_t pid);
 #endif

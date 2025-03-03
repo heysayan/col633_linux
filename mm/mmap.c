@@ -57,6 +57,12 @@
 
 #include "internal.h"
 
+// New feature
+#include <linux/resource_tracker.h>
+extern struct list_head tracked_resources_list ;
+// end
+
+
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
 #endif
@@ -273,6 +279,14 @@ success:
 	userfaultfd_unmap_complete(mm, &uf);
 	if (populate)
 		mm_populate(oldbrk, newbrk - oldbrk);
+// additional feature
+	struct pid_node *cur;
+	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+		if ((cur->proc_resource)->pid == current->pid){
+			(cur->proc_resource)->heapsize += (brk - origbrk) ;
+		}
+	}
+//end
 	return brk;
 
 out:
