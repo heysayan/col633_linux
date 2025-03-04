@@ -2800,18 +2800,21 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 
 /*Resource tracking feature*/
 LIST_HEAD(tracked_resources_list) ; // Initializes the monitored process linked list
-//DEFINE_MUTEX(tracked_resources_list); // mutex for safe concurrent read/write
+resource_tracker_lock = __RW_LOCK_UNLOCKED(resource_tracker_lock); // rw_lcok for safe concurrent read/write
+
 SYSCALL_DEFINE1(register,pid_t,pid){
 	struct pid_node *cur;
 	struct pid *pid_struct_;
 	if (pid<1) return -22;
-	//mutex_lock(&tracked_resources_list);
+	read_lock(&resource_tracker_lock);
 	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
 		if ((cur->proc_resource)->pid == pid) {
-			//mutex_unlock(&tracked_resources_list);
+			read_unlock(&resource_tracker_lock);;
 			return -23;
 		}
 	}
+	read_unlock(&resource_tracker_lock);
+
 	pid_struct_ = find_get_pid(pid);
 	if (!pid_struct_) return -3;
 	else {
@@ -2823,7 +2826,11 @@ SYSCALL_DEFINE1(register,pid_t,pid){
 		pn1 = kmalloc(sizeof(struct pid_node),GFP_KERNEL);
 		if (!pn1) {kfree(p1);return -ENOMEM;}
 		pn1->proc_resource = p1;
+
+		write_lock(&resource_tracker_lock);	// acquiring write lock
 		list_add(&(pn1->next_prev_list),&tracked_resources_list);
+		write_unlock(&resource_tracker_lock);
+
 		put_pid(pid_struct_);
 		return 0;
 	}
@@ -2832,26 +2839,34 @@ SYSCALL_DEFINE1(register,pid_t,pid){
 
 SYSCALL_DEFINE2(fetch,struct per_proc_resource __user *,stats,pid_t,pid){
 	struct pid_node *cur;
+	read_lock(&resource_tracker_lock);
 	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
 		if ((cur->proc_resource)->pid == pid){
-			if (copy_to_user(stats,cur->proc_resource, sizeof(struct per_proc_resource)))
+			if (copy_to_user(stats,cur->proc_resource, sizeof(struct per_proc_resource))){
+				read_unlock(&resource_tracker_lock);
 				return -22;
+			}
+			read_unlock(&resource_tracker_lock);
 			return 0;
 		}
 	}
+	read_unlock(&resource_tracker_lock);
 	return -22;
 }
 
 SYSCALL_DEFINE1(deregister,pid_t,pid){
 	struct pid_node *cur;
 	if (pid<1) return -22;
+	write_lock(&resource_tracker_lock);
 	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
 		if ((cur->proc_resource)->pid == pid){
 			kfree(cur->proc_resource);
 			list_del(&(cur->next_prev_list));
 			kfree(cur);
+			write_unlock(&resource_tracker_lock);
 			return 0;
 		}
 	}
+	write_unlock(&resource_tracker_lock);
 	return -3;
 }

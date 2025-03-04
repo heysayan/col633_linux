@@ -281,11 +281,14 @@ success:
 	if (populate)
 		mm_populate(oldbrk, newbrk - oldbrk);
 // additional feature
+	write_lock(&resource_tracker_lock);
 	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
 		if ((cur->proc_resource)->pid == current->pid){
 			(cur->proc_resource)->heapsize += (brk - origbrk) ;
+			break;
 		}
 	}
+	write_unlock(&resource_tracker_lock);
 //end
 	return brk;
 
