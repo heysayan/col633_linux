@@ -2797,10 +2797,9 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 }
 #endif /* CONFIG_COMPAT */
 
-
 /*Resource tracking feature*/
 LIST_HEAD(tracked_resources_list) ; // Initializes the monitored process linked list
-resource_tracker_lock = __RW_LOCK_UNLOCKED(resource_tracker_lock); // rw_lcok for safe concurrent read/write
+rwlock_t resource_tracker_lock = __RW_LOCK_UNLOCKED(resource_tracker_lock); // rw_lock for safe concurrent read/write
 
 SYSCALL_DEFINE1(register,pid_t,pid){
 	struct pid_node *cur;
