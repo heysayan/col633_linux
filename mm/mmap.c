@@ -175,6 +175,7 @@ static int do_brk_flags(struct ma_state *mas, struct vm_area_struct *brkvma,
 		unsigned long addr, unsigned long request, unsigned long flags);
 SYSCALL_DEFINE1(brk, unsigned long, brk)
 {
+	struct pid_node *cur;	// for new feature
 	unsigned long newbrk, oldbrk, origbrk;
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *brkvma, *next = NULL;
@@ -280,7 +281,6 @@ success:
 	if (populate)
 		mm_populate(oldbrk, newbrk - oldbrk);
 // additional feature
-	struct pid_node *cur;
 	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
 		if ((cur->proc_resource)->pid == current->pid){
 			(cur->proc_resource)->heapsize += (brk - origbrk) ;
