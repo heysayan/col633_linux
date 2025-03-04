@@ -5,6 +5,7 @@
 #include <sys/syscall.h>
 #include <errno.h>
 #include <string.h>
+#include <fcntl.h> 
 
 #define SYS_register 451  // Replace with actual syscall numbers
 #define SYS_fetch 452
@@ -44,22 +45,83 @@ void test_syscalls() {
     // printf("Allocated 1MB of memory.\n");
 
     // Force heap expansion using sbrk()
+    // void *old_brk = sbrk(0);
+    // sbrk(1024 * 1024);  // Expand heap by 1MB
+    // void *new_brk = sbrk(0);
+    // printf("Heap expanded by: %ld bytes\n", (char *)new_brk - (char *)old_brk);
+
+    /* 2. Force heap expansion using sbrk() */
     void *old_brk = sbrk(0);
-    sbrk(1024 * 1024);  // Expand heap by 1MB
+    if (sbrk(1024 * 1024) == (void *)-1) {  // Expand heap by 1MB
+        perror("sbrk failed");
+        syscall(SYS_deregister, pid);
+        exit(EXIT_FAILURE);
+    }
     void *new_brk = sbrk(0);
     printf("Heap expanded by: %ld bytes\n", (char *)new_brk - (char *)old_brk);
 
+
+    /* 3. Test open file count */
+    /* Open two files using open() */
+    int fd1 = open("/dev/null", O_RDONLY);
+    if (fd1 < 0) {
+        perror("open /dev/null failed");
+    } else {
+        printf("Opened /dev/null: fd=%d\n", fd1);
+    }
+    int fd2 = open("/dev/null", O_RDONLY);
+    if (fd2 < 0) {
+        perror("open /dev/null failed");
+    } else {
+        printf("Opened /dev/null: fd=%d\n", fd2);
+    }
 
     // Fetch updated resource usage
     struct per_proc_resource stats;
     ret = syscall(SYS_fetch, &stats, pid);
     if (ret < 0) {
         printf("sys_fetch failed: %s\n", strerror(errno));
+        syscall(SYS_deregister, pid);
+        exit(EXIT_FAILURE);
     } else {
+        printf("After opening files:\n");
         printf("Fetched Resource Usage:\n");
         printf("Heap Size: %lu bytes\n", stats.heapsize);
         printf("Open Files: %lu\n", stats.openfile_count);
     }
+
+    /* 5. Close the opened files */
+    if (fd1 >= 0) {
+        ret = close(fd1);
+        if (ret < 0)
+            perror("close fd1 failed");
+        else
+            printf("Closed fd1=%d\n", fd1);
+    }
+    if (fd2 >= 0) {
+        ret = close(fd2);
+        if (ret < 0)
+            perror("close fd2 failed");
+        else
+            printf("Closed fd2=%d\n", fd2);
+    }
+
+    /* Give a moment for the close syscalls to update the tracked open file count */
+    sleep(1);
+
+
+
+
+    /* 6. Fetch resource usage after closing files */
+    ret = syscall(SYS_fetch, &stats, pid);
+    if (ret < 0) {
+        perror("sys_fetch failed after closing files");
+        syscall(SYS_deregister, pid);
+        exit(EXIT_FAILURE);
+    }
+    printf("After closing files:\n");
+    printf("  Heap Size: %lu bytes\n", stats.heapsize);
+    printf("  Open File Count: %lu\n", stats.openfile_count);
 
     // Deregister process
     ret = syscall(SYS_deregister, pid);
@@ -68,7 +130,6 @@ void test_syscalls() {
     } else {
         printf("Process deregistered successfully.\n");
     }
-
     // // Free allocated memory
     // free(p1);
 }
