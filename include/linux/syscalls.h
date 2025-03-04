@@ -1390,6 +1390,6 @@ int __sys_setsockopt(int fd, int level, int optname, char __user *optval,
 
 // New features
 asmlinkage long sys_register(pid_t pid);
-asmlinkage long sys_fetch(struct proc_resource __user *stats, pid_t pid);
+asmlinkage long sys_fetch(struct per_proc_resource __user *stats, pid_t pid);
 asmlinkage long sys_deregister(pid_t pid);
 #endif

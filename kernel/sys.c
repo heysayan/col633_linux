@@ -79,7 +79,7 @@
 /*For New features*/
 #include <linux/resource_tracker.h>
 #include <linux/pid.h>
-
+//#include <linux/mutex.h>
 
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
@@ -2800,12 +2800,16 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 
 /*Resource tracking feature*/
 LIST_HEAD(tracked_resources_list) ; // Initializes the monitored process linked list
-
+//DEFINE_MUTEX(tracked_resources_list); // mutex for safe concurrent read/write
 SYSCALL_DEFINE1(register,pid_t,pid){
 	if (pid<1) return -22;
 	struct pid_node *cur;
+	//mutex_lock(&tracked_resources_list);
 	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
-		if ((cur->proc_resource)->pid == pid) return -23;
+		if ((cur->proc_resource)->pid == pid) {
+			//mutex_unlock(&tracked_resources_list);
+			return -23;
+		}
 	}
 	struct pid *pid_struct_ = find_get_pid(pid);
 	if (!pid_struct_) return -3;

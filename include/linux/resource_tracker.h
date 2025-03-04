@@ -1,5 +1,5 @@
-#ifndef RESOURCE_TRACKER
-#define RESOURCE_TRACKER
+#ifndef _RESOURCE_TRACKER_H_
+#define _RESOURCE_TRACKER_H_
 #include <linux/list.h>
 #include <linux/types.h>
 struct pid_node {
