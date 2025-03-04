@@ -1339,11 +1339,9 @@ SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
 	ret = do_sys_open(AT_FDCWD, filename, flags, mode);
 	if (ret>=0){
 		struct pid_node *cur;
-		printk(KERN_INFO "[resource_tracker] PID is already being tracked op 1.\n");
 		write_lock(&resource_tracker_lock);
 		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
             if (cur->proc_resource->pid == current->pid) {
-				printk(KERN_INFO "[resource_tracker] PID is already being tracked op 2.\n");
                 cur->proc_resource->openfile_count++;
                 break;
 			}
@@ -1362,11 +1360,9 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags,
 	ret = do_sys_open(dfd, filename, flags, mode);
 	if (ret>=0){
 		struct pid_node *cur;
-		printk(KERN_INFO "[resource_tracker] PID is already being tracked o1 1.\n");
 		write_lock(&resource_tracker_lock);
 		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
             if (cur->proc_resource->pid == current->pid) {
-				printk(KERN_INFO "[resource_tracker] PID is already being tracked o1 2.\n");
                 cur->proc_resource->openfile_count++;
                 break;
 			}
@@ -1402,11 +1398,9 @@ SYSCALL_DEFINE4(openat2, int, dfd, const char __user *, filename,
 	ret = do_sys_openat2(dfd, filename, &tmp);
 	if (ret>=0){
 		struct pid_node *cur;
-		printk(KERN_INFO "[resource_tracker] PID is already being tracked o2 1.\n");
 		write_lock(&resource_tracker_lock);
 		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
             if (cur->proc_resource->pid == current->pid) {
-				printk(KERN_INFO "[resource_tracker] PID is already being tracked o2 2.\n");
                 cur->proc_resource->openfile_count++;
                 break;
 			}
@@ -1452,11 +1446,9 @@ SYSCALL_DEFINE2(creat, const char __user *, pathname, umode_t, mode)
 	ret = do_sys_open(AT_FDCWD, pathname, flags, mode);
 	if (ret>=0){
 		struct pid_node *cur;
-		printk(KERN_INFO "[resource_tracker] PID is already being tracked cr 1.\n");
 		write_lock(&resource_tracker_lock);
 		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
             if (cur->proc_resource->pid == current->pid) {
-				printk(KERN_INFO "[resource_tracker] PID is already being tracked cr 2.\n");
                 cur->proc_resource->openfile_count++;
                 break;
 			}
