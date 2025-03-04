@@ -52,7 +52,7 @@ void test_syscalls() {
 
     /* 2. Force heap expansion using sbrk() */
     void *old_brk = sbrk(0);
-    if (sbrk(1024 * 1024) == (void *)-1) {  // Expand heap by 1MB
+    if (sbrk(128 * 1024) == (void *)-1) {  // Expand heap by 128KB
         perror("sbrk failed");
         syscall(SYS_deregister, pid);
         exit(EXIT_FAILURE);
@@ -63,11 +63,11 @@ void test_syscalls() {
 
     /* 3. Test open file count */
     /* Open two files using open() */
-    int fd1 = open("/dev/null", O_RDONLY);
+    int fd1 = open("/test.txt", O_RDONLY);
     if (fd1 < 0) {
-        perror("open /dev/null failed");
+        perror("open /test.txt failed");
     } else {
-        printf("Opened /dev/null: fd=%d\n", fd1);
+        printf("Opened /test.txt: fd=%d\n", fd1);
     }
     int fd2 = open("/dev/null", O_RDONLY);
     if (fd2 < 0) {
@@ -84,7 +84,7 @@ void test_syscalls() {
         syscall(SYS_deregister, pid);
         exit(EXIT_FAILURE);
     } else {
-        printf("After opening files:\n");
+        printf("After opening files and expanding heap:\n");
         printf("Fetched Resource Usage:\n");
         printf("Heap Size: %lu bytes\n", stats.heapsize);
         printf("Open Files: %lu\n", stats.openfile_count);
@@ -106,6 +106,13 @@ void test_syscalls() {
             printf("Closed fd2=%d\n", fd2);
     }
 
+    old_brk = sbrk(0);
+    if (sbrk(-128*1024) == (void *)-1) {
+        perror("sbrk failed");
+    }
+    new_brk = sbrk(0);
+    printf("Heap decreased by: %ld bytes\n", (char *)new_brk - (char *)old_brk);
+    
     /* Give a moment for the close syscalls to update the tracked open file count */
     sleep(1);
 
@@ -119,7 +126,7 @@ void test_syscalls() {
         syscall(SYS_deregister, pid);
         exit(EXIT_FAILURE);
     }
-    printf("After closing files:\n");
+    printf("After closing files and reducing heap:\n");
     printf("  Heap Size: %lu bytes\n", stats.heapsize);
     printf("  Open File Count: %lu\n", stats.openfile_count);
 
