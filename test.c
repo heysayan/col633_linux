@@ -35,13 +35,20 @@ void test_syscalls() {
     }
     printf("Process registered successfully.\n");
 
-    // Allocate memory to trigger brk() syscall
-    void *p1 = malloc(1024 * 1024);  // Allocate 1MB
-    if (!p1) {
-        printf("Malloc failed.\n");
-        return;
-    }
-    printf("Allocated 1MB of memory.\n");
+    // // Allocate memory to trigger brk() syscall
+    // void *p1 = malloc(1024 * 1024);  // Allocate 1MB
+    // if (!p1) {
+    //     printf("Malloc failed.\n");
+    //     return;
+    // }
+    // printf("Allocated 1MB of memory.\n");
+
+    // Force heap expansion using sbrk()
+    void *old_brk = sbrk(0);
+    sbrk(1024 * 1024);  // Expand heap by 1MB
+    void *new_brk = sbrk(0);
+    printf("Heap expanded by: %ld bytes\n", (char *)new_brk - (char *)old_brk);
+
 
     // Fetch updated resource usage
     struct per_proc_resource stats;
@@ -62,8 +69,8 @@ void test_syscalls() {
         printf("Process deregistered successfully.\n");
     }
 
-    // Free allocated memory
-    free(p1);
+    // // Free allocated memory
+    // free(p1);
 }
 
 int main() {
