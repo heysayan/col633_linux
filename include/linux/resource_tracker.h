@@ -17,6 +17,6 @@ struct per_proc_resource {
     files of a process using the open , openat , and
     openat2 system calls */
 };
-
+extern struct list_head tracked_resources_list;
 extern rwlock_t resource_tracker_lock;
 #endif

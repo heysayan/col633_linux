@@ -36,6 +36,10 @@
 
 #include "internal.h"
 
+//new feature
+#include <linux/resource_tracker.h>
+//end
+
 int do_truncate(struct user_namespace *mnt_userns, struct dentry *dentry,
 		loff_t length, unsigned int time_attrs, struct file *filp)
 {
@@ -1329,23 +1333,50 @@ long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
 
 SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
 {
+	int ret;
 	if (force_o_largefile())
 		flags |= O_LARGEFILE;
-	return do_sys_open(AT_FDCWD, filename, flags, mode);
+	ret = do_sys_open(AT_FDCWD, filename, flags, mode);
+	if (ret>=0){
+		struct pid_node *cur;
+		write_lock(&resource_tracker_lock);
+		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+            if (cur->proc_resource->pid == current->pid) {
+                cur->proc_resource->openfile_count++;
+                break;
+			}
+		}
+		write_unlock(&resource_tracker_lock);
+	}
+	return ret;
 }
 
 SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags,
 		umode_t, mode)
 {
+	int ret;
 	if (force_o_largefile())
 		flags |= O_LARGEFILE;
-	return do_sys_open(dfd, filename, flags, mode);
+	ret = do_sys_open(dfd, filename, flags, mode);
+	if (ret>=0){
+		struct pid_node *cur;
+		write_lock(&resource_tracker_lock);
+		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+            if (cur->proc_resource->pid == current->pid) {
+                cur->proc_resource->openfile_count++;
+                break;
+			}
+		}
+		write_unlock(&resource_tracker_lock);
+	}
+	return ret;
 }
 
 SYSCALL_DEFINE4(openat2, int, dfd, const char __user *, filename,
 		struct open_how __user *, how, size_t, usize)
 {
 	int err;
+	int ret;
 	struct open_how tmp;
 
 	BUILD_BUG_ON(sizeof(struct open_how) < OPEN_HOW_SIZE_VER0);
@@ -1364,7 +1395,19 @@ SYSCALL_DEFINE4(openat2, int, dfd, const char __user *, filename,
 	if (!(tmp.flags & O_PATH) && force_o_largefile())
 		tmp.flags |= O_LARGEFILE;
 
-	return do_sys_openat2(dfd, filename, &tmp);
+	ret = do_sys_openat2(dfd, filename, &tmp);
+	if (ret>=0){
+		struct pid_node *cur;
+		write_lock(&resource_tracker_lock);
+		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+            if (cur->proc_resource->pid == current->pid) {
+                cur->proc_resource->openfile_count++;
+                break;
+			}
+		}
+		write_unlock(&resource_tracker_lock);
+	}
+	return ret;
 }
 
 #ifdef CONFIG_COMPAT
@@ -1395,11 +1438,24 @@ COMPAT_SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, fla
  */
 SYSCALL_DEFINE2(creat, const char __user *, pathname, umode_t, mode)
 {
+	int ret;
 	int flags = O_CREAT | O_WRONLY | O_TRUNC;
 
 	if (force_o_largefile())
 		flags |= O_LARGEFILE;
-	return do_sys_open(AT_FDCWD, pathname, flags, mode);
+	ret = do_sys_open(AT_FDCWD, pathname, flags, mode);
+	if (ret>=0){
+		struct pid_node *cur;
+		write_lock(&resource_tracker_lock);
+		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+            if (cur->proc_resource->pid == current->pid) {
+                cur->proc_resource->openfile_count++;
+                break;
+			}
+		}
+		write_unlock(&resource_tracker_lock);
+	}
+	return ret;	
 }
 #endif
 
@@ -1444,7 +1500,17 @@ SYSCALL_DEFINE1(close, unsigned int, fd)
 		     retval == -ERESTARTNOHAND ||
 		     retval == -ERESTART_RESTARTBLOCK))
 		retval = -EINTR;
-
+	else if (retval == 0){
+		struct pid_node *cur;
+		write_lock(&resource_tracker_lock);
+		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+            if (cur->proc_resource->pid == current->pid) {
+                cur->proc_resource->openfile_count--;
+                break;
+			}
+		}
+		write_unlock(&resource_tracker_lock);
+	}
 	return retval;
 }
 
