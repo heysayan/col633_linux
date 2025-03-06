@@ -2802,35 +2802,65 @@ LIST_HEAD(tracked_resources_list) ; // Initializes the monitored process linked 
 rwlock_t resource_tracker_lock = __RW_LOCK_UNLOCKED(resource_tracker_lock); // rw_lock for safe concurrent read/write
 
 SYSCALL_DEFINE1(register,pid_t,pid){
-	struct pid_node *cur;
-	struct pid *pid_struct_;
+	struct pid_node *cur;	// to traverse tracked_resources_list
+	struct pid *pid_struct_;	// struct pid of given pid
 	if (pid<1) return -22;
-	read_lock(&resource_tracker_lock);
+	// checking if pid already in list
+	write_lock(&resource_tracker_lock);	// acquiring write lock
 	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
 		if ((cur->proc_resource)->pid == pid) {
-			read_unlock(&resource_tracker_lock);;
+			write_unlock(&resource_tracker_lock);
 			return -23;
 		}
 	}
-	read_unlock(&resource_tracker_lock);
+	//read_unlock(&resource_tracker_lock);
+	//
 
-	pid_struct_ = find_get_pid(pid);
-	if (!pid_struct_) return -3;
+	pid_struct_ = find_get_pid(pid);// returns pid_struct of given pid of current namespace and increases the reference count of pid struct
+	if (!pid_struct_) {
+		write_unlock(&resource_tracker_lock);
+		return -3;// process with pid don't exist in current namespace
+	}
 	else {
 		struct pid_node *pn1;
 		struct per_proc_resource *p1 = kmalloc(sizeof(struct per_proc_resource),GFP_KERNEL);
-		if (!p1) return -ENOMEM;
+		if (!p1) {// kernel could not allocate space for new pid_node
+			write_unlock(&resource_tracker_lock);
+			return -ENOMEM;
+		}
 		p1->pid = pid;
 		p1->heapsize = 0; p1->openfile_count = 0;
 		pn1 = kmalloc(sizeof(struct pid_node),GFP_KERNEL);
-		if (!pn1) {kfree(p1);return -ENOMEM;}
+		if (!pn1) {	// kernel could not allocate space for new pid_node
+			kfree(p1);
+			write_unlock(&resource_tracker_lock);
+			return -ENOMEM;}
 		pn1->proc_resource = p1;
 
-		write_lock(&resource_tracker_lock);	// acquiring write lock
+		//write_lock(&resource_tracker_lock);	
 		list_add(&(pn1->next_prev_list),&tracked_resources_list);
-		write_unlock(&resource_tracker_lock);
+		
 
-		put_pid(pid_struct_);
+		// // setting heap_quota and file_quota of all threads with given pid to -1
+		// // for multithreaded process
+		// rcu_read_lock();
+		// cur_t = pid_task(pid_struct_,PIDTYPE_TGID);
+		// if (cur_t){
+		// 	cur_t->heap_quota = -1;cur_t->file_quota = -1;
+		// 	hlist_for_each_entry_continue(cur_t,pid_links[(PIDTYPE_TGID)]){
+		// 		if (cur_t){	// if cur_t is not released while being read
+		// 			cur_t->heap_quota = -1;
+		// 			cur_t->file_quota = -1;
+		// 		}
+		// 		// else break; not needed since hlist_for_each_entry uses hlist_entry_safe
+		// 	}
+		// }
+		// rcu_read_unlock();
+
+		//
+
+		put_pid(pid_struct_);// decreases the reference count of the pid struct
+		write_unlock(&resource_tracker_lock);	// releasing write lock
 		return 0;
 	}
 
@@ -2868,4 +2898,160 @@ SYSCALL_DEFINE1(deregister,pid_t,pid){
 	}
 	write_unlock(&resource_tracker_lock);
 	return -3;
+}
+
+SYSCALL_DEFINE3(resource_cap,pid_t,pid,long,heap_quota,long,file_quota){
+	struct pid_node *cur;	// to traverse tracked_resources_list
+	struct pid *pid_struct_;	// struct pid of given pid
+	int exist = 0;
+	// checking if process is being tracked
+	write_lock(&resource_tracker_lock);
+	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+		if ((cur->proc_resource)->pid == pid) {
+			//read_unlock(&resource_tracker_lock);;
+			exist=1;
+			break;
+		}
+	}
+	if (!exist){	// process not being tracked
+		write_unlock(&resource_tracker_lock);
+		return -22;
+	}
+	//
+
+	pid_struct_ = find_get_pid(pid);// returns pid_struct of given pid of current namespace and increases the reference count of pid struct
+	if (!pid_struct_) {// process with pid don't exist in current namespace
+		write_unlock(&resource_tracker_lock);
+		return -3;
+	}
+	else {
+		struct task_struct *cur_t;
+		struct task_struct *temp_t;
+		cur_t = get_pid_task(pid_struct_,PIDTYPE_TGID);
+		
+		//rcu_read_lock();
+		if (!cur_t) {
+			put_pid(pid_struct_);
+			write_unlock(&resource_tracker_lock);
+			return -ESRCH; // No such process
+		}
+		temp_t = cur_t;
+		
+		if (cur_t->heap_quota != -1) {	// quota already defined
+			//rcu_read_unlock();
+			// Note: we're not killing process based on new quota,user has to first reset the quota
+			// to define new quota
+			put_task_struct(cur_t);
+			put_pid(pid_struct_);
+			write_unlock(&resource_tracker_lock);
+			return -23 ;
+		}
+
+		//checking if quota is not already reached
+		if ((cur->proc_resource->heapsize > heap_quota)||(cur->proc_resource->openfile_count > file_quota)){
+			// quota already reached, so untracking
+			//rcu_read_unlock();
+			//write_lock(&resource_tracker_lock);
+			kfree(cur->proc_resource);
+			list_del(&(cur->next_prev_list));
+			kfree(cur);
+			// killing the process
+			if (current->tgid == cur_t->tgid){
+				// we're killing the current thread
+				put_task_struct(cur_t);
+				put_pid(pid_struct_);
+				write_unlock(&resource_tracker_lock);
+				send_sig(SIGKILL,current,0);
+			}
+			else{
+				if (pid_alive(cur_t)){
+					send_sig(SIGKILL,cur_t,0);
+					put_task_struct(cur_t);
+					put_pid(pid_struct_);
+					write_unlock(&resource_tracker_lock);
+					return 0;
+				}
+				else{
+					put_task_struct(cur_t);
+					put_pid(pid_struct_);
+					write_unlock(&resource_tracker_lock);
+					return 0;
+				}
+			}
+
+		}
+		else{	//updating quota of all threads in thread group
+			cur_t->heap_quota = heap_quota;cur_t->file_quota = file_quota;
+			rcu_read_lock();
+			hlist_for_each_entry_continue_rcu(cur_t,pid_links[(PIDTYPE_TGID)]){
+				cur_t->heap_quota = heap_quota;
+				cur_t->file_quota = file_quota;
+				// else break; not needed since hlist_for_each_entry uses hlist_entry_safe
+			}
+			rcu_read_unlock();
+			put_task_struct(temp_t);
+		}
+
+		put_pid(pid_struct_);// decreases the reference count of the pid struct
+		write_unlock(&resource_tracker_lock);
+		return 0;
+	}
+}
+
+SYSCALL_DEFINE1(resource_reset,pid_t,pid){
+	struct pid_node *cur;	// to traverse tracked_resources_list
+	struct pid *pid_struct_;	// struct pid of given pid
+	int exist = 0;
+	// checking if process is being tracked
+	write_lock(&resource_tracker_lock);
+	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
+		if ((cur->proc_resource)->pid == pid) {
+			//read_unlock(&resource_tracker_lock);;
+			exist=1;
+			break;
+		}
+	}
+	if (!exist){	// process not being tracked
+		write_unlock(&resource_tracker_lock);
+		return -22;
+	}
+	//
+
+	pid_struct_ = find_get_pid(pid);// returns pid_struct of given pid of current namespace and increases the reference count of pid struct
+	if (!pid_struct_) {// process with pid don't exist in current namespace
+		write_unlock(&resource_tracker_lock);
+		return -3;
+	}
+	else {
+		struct task_struct *cur_t;
+		struct task_struct *temp_t;
+		cur_t = get_pid_task(pid_struct_,PIDTYPE_TGID);
+		//rcu_read_lock();
+		if (!cur_t) {
+			put_pid(pid_struct_);
+			write_unlock(&resource_tracker_lock);
+			return -ESRCH; // No such process
+		}
+		temp_t = cur_t;
+		if (cur_t->heap_quota == -1 && cur_t->file_quota == -1) {	// quota already reset
+			put_task_struct(cur_t);
+			put_pid(pid_struct_);
+			write_unlock(&resource_tracker_lock);
+			return 0 ;
+		}
+
+
+		cur_t->heap_quota = -1;cur_t->file_quota = -1;
+		rcu_read_lock();
+		hlist_for_each_entry_continue_rcu(cur_t,pid_links[(PIDTYPE_TGID)]){
+			cur_t->heap_quota = -1;
+			cur_t->file_quota = -1;
+			// else break; not needed since hlist_for_each_entry uses hlist_entry_safe
+		}
+		rcu_read_unlock();
+		put_task_struct(temp_t);
+		put_pid(pid_struct_);// decreases the reference count of the pid struct
+		write_unlock(&resource_tracker_lock);
+		return 0;
+	}
 }

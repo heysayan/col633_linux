@@ -59,7 +59,7 @@
 
 // New feature
 #include <linux/resource_tracker.h>
-extern struct list_head tracked_resources_list ;
+#include <linux/signal.h>
 // end
 
 
@@ -283,8 +283,17 @@ success:
 // additional feature
 	write_lock(&resource_tracker_lock);
 	list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
-		if ((cur->proc_resource)->pid == current->pid){
-			(cur->proc_resource)->heapsize += (brk - origbrk) ;
+		if ((cur->proc_resource)->pid == current->tgid){
+			(cur->proc_resource)->heapsize += ((brk - origbrk)/1024)/1024 ;
+			// if quota exceeds, kill this thread and untrack
+			if (cur->proc_resource->heapsize > current->heap_quota){
+				// deleting pid_node from tracked list
+				kfree(cur->proc_resource);
+				list_del(&(cur->next_prev_list));
+				kfree(cur);
+				write_unlock(&resource_tracker_lock);//release lock
+				send_sig(SIGKILL, current,0);
+			}
 			break;
 		}
 	}
@@ -1472,6 +1481,29 @@ unsigned long ksys_mmap_pgoff(unsigned long addr, unsigned long len,
 	}
 
 	retval = vm_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+// new feature
+	if ((flags & (MAP_ANONYMOUS | MAP_PRIVATE))&& (retval>=0)){
+		struct pid_node *cur;
+		write_lock(&resource_tracker_lock);
+		list_for_each_entry(cur, &tracked_resources_list, next_prev_list) {
+			if (cur->proc_resource->pid == current->tgid) {
+				cur->proc_resource->heapsize += (len/1024)/1024;
+				// if quota exceeds, kill this thread and untrack
+				if (cur->proc_resource->heapsize > current->heap_quota){
+					// deleting pid_node from tracked list
+					kfree(cur->proc_resource);
+					list_del(&(cur->next_prev_list));
+					kfree(cur);
+					write_unlock(&resource_tracker_lock);
+					// killing current process
+					send_sig(SIGKILL, current,0);
+				}
+				break;
+			}
+		}
+		write_unlock(&resource_tracker_lock);
+	}
+//end
 out_fput:
 	if (file)
 		fput(file);

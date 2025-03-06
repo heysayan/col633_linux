@@ -1392,4 +1392,6 @@ int __sys_setsockopt(int fd, int level, int optname, char __user *optval,
 asmlinkage long sys_register(pid_t pid);
 asmlinkage long sys_fetch(struct per_proc_resource __user *stats, pid_t pid);
 asmlinkage long sys_deregister(pid_t pid);
+asmlinkage long sys_resource_cap(pid_t pid,long heap_quota,long file_quota);
+asmlinkage long sys_resource_reset(pid_t pid);
 #endif

@@ -210,6 +210,8 @@ struct task_struct init_task
 #ifdef CONFIG_SECCOMP_FILTER
 	.seccomp	= { .filter_count = ATOMIC_INIT(0) },
 #endif
+	.heap_quota = -1,
+	.file_quota = -1,
 };
 EXPORT_SYMBOL(init_task);
 

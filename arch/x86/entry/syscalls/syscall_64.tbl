@@ -375,6 +375,8 @@
 451 common  register        sys_register
 452 common  fetch           sys_fetch
 453 common  deregister      sys_deregister
+454 common  resource_cap    sys_resource_cap
+455 common  resource_reset  sys_resource_reset
 #
 # Due to a historical design error, certain syscalls are numbered differently
 # in x32 as compared to native x86_64.  These syscalls have numbers 512-547.

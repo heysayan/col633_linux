@@ -458,3 +458,5 @@
 451 i386    register        sys_register
 452 i386    fetch           sys_fetch
 453 i386    deregister      sys_deregister
+454 i386    resource_cap    sys_resource_cap
+455 i386    resource_reset  sys_resource_reset

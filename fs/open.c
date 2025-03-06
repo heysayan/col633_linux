@@ -38,6 +38,7 @@
 
 //new feature
 #include <linux/resource_tracker.h>
+#include <linux/signal.h>
 //end
 
 int do_truncate(struct user_namespace *mnt_userns, struct dentry *dentry,
@@ -1341,9 +1342,20 @@ SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
 		struct pid_node *cur;
 		write_lock(&resource_tracker_lock);
 		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
-            if (cur->proc_resource->pid == current->pid) {
+            if (cur->proc_resource->pid == current->tgid) {
                 cur->proc_resource->openfile_count++;
-                break;
+				// if quota exceeds, kill this thread and untrack
+				if (cur->proc_resource->openfile_count > current->file_quota){
+					// deleting pid_node from tracked list
+					kfree(cur->proc_resource);
+					list_del(&(cur->next_prev_list));
+					kfree(cur);
+					write_unlock(&resource_tracker_lock);
+					// killing current process
+					send_sig(SIGKILL, current,0);
+					return ret;
+				}
+				break;
 			}
 		}
 		write_unlock(&resource_tracker_lock);
@@ -1362,9 +1374,20 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags,
 		struct pid_node *cur;
 		write_lock(&resource_tracker_lock);
 		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
-            if (cur->proc_resource->pid == current->pid) {
+            if (cur->proc_resource->pid == current->tgid) {
                 cur->proc_resource->openfile_count++;
-                break;
+				// if quota exceeds, kill this thread and untrack
+				if (cur->proc_resource->openfile_count > current->file_quota){
+					// deleting pid_node from tracked list
+					kfree(cur->proc_resource);
+					list_del(&(cur->next_prev_list));
+					kfree(cur);
+					write_unlock(&resource_tracker_lock);
+					// killing current process
+					send_sig(SIGKILL, current,0);
+					return ret;
+				}
+				break;
 			}
 		}
 		write_unlock(&resource_tracker_lock);
@@ -1400,9 +1423,20 @@ SYSCALL_DEFINE4(openat2, int, dfd, const char __user *, filename,
 		struct pid_node *cur;
 		write_lock(&resource_tracker_lock);
 		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
-            if (cur->proc_resource->pid == current->pid) {
+            if (cur->proc_resource->pid == current->tgid) {
                 cur->proc_resource->openfile_count++;
-                break;
+				// if quota exceeds, kill this thread and untrack
+				if (cur->proc_resource->openfile_count > current->file_quota){
+					// deleting pid_node from tracked list
+					kfree(cur->proc_resource);
+					list_del(&(cur->next_prev_list));
+					kfree(cur);
+					write_unlock(&resource_tracker_lock);
+					// killing current process
+					send_sig(SIGKILL, current,0);
+					return ret;
+				}
+				break;
 			}
 		}
 		write_unlock(&resource_tracker_lock);
@@ -1448,9 +1482,20 @@ SYSCALL_DEFINE2(creat, const char __user *, pathname, umode_t, mode)
 		struct pid_node *cur;
 		write_lock(&resource_tracker_lock);
 		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
-            if (cur->proc_resource->pid == current->pid) {
+            if (cur->proc_resource->pid == current->tgid) {
                 cur->proc_resource->openfile_count++;
-                break;
+				// if quota exceeds, kill this thread and untrack
+				if (cur->proc_resource->openfile_count > current->file_quota){
+					// deleting pid_node from tracked list
+					kfree(cur->proc_resource);
+					list_del(&(cur->next_prev_list));
+					kfree(cur);
+					write_unlock(&resource_tracker_lock);
+					// killing current process
+					send_sig(SIGKILL, current,0);
+					return ret;
+				}
+				break;
 			}
 		}
 		write_unlock(&resource_tracker_lock);
@@ -1504,7 +1549,7 @@ SYSCALL_DEFINE1(close, unsigned int, fd)
 		struct pid_node *cur;
 		write_lock(&resource_tracker_lock);
 		list_for_each_entry(cur,&tracked_resources_list,next_prev_list){
-            if (cur->proc_resource->pid == current->pid) {
+            if (cur->proc_resource->pid == current->tgid) {
                 cur->proc_resource->openfile_count--;
                 break;
 			}

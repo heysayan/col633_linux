@@ -893,10 +893,13 @@ __SYSCALL(__NR_register,sys_register)
 __SYSCALL(__NR_fetch,sys_fetch)
 #define __NR_deregister 453
 __SYSCALL(__NR_deregister,sys_deregister)
-
+#define __NR_resource_cap 454
+__SYSCALL(__NR_resource_cap,sys_resource_cap)
+#define __NR_resource_reset 455
+__SYSCALL(__NR_resource_reset,sys_resource_reset)
 //end
 #undef __NR_syscalls
-#define __NR_syscalls 454
+#define __NR_syscalls 456
 
 /*
  * 32 bit systems traditionally used different
