@@ -10,6 +10,8 @@
 #define SYS_register 451  // Replace with actual syscall numbers
 #define SYS_fetch 452
 #define SYS_deregister 453
+#define SYS_resource_cap 454
+#define SYS_resource_reset 455
 
 struct per_proc_resource {
     pid_t pid ;
@@ -58,16 +60,17 @@ void test_syscalls() {
         exit(EXIT_FAILURE);
     }
     void *new_brk = sbrk(0);
-    printf("Heap expanded by: %ld bytes\n", (char *)new_brk - (char *)old_brk);
+    printf("Heap expanded by: %ld Bytes\n", (char *)new_brk - (char *)old_brk);
+
 
 
     /* 3. Test open file count */
     /* Open two files using open() */
-    int fd1 = open("/test.txt", O_RDONLY);
+    int fd1 = open("/dev/null", O_RDONLY);
     if (fd1 < 0) {
-        perror("open /test.txt failed");
+        perror("open /dev/null failed");
     } else {
-        printf("Opened /test.txt: fd=%d\n", fd1);
+        printf("Opened /dev/null fd=%d\n", fd1);
     }
     int fd2 = open("/dev/null", O_RDONLY);
     if (fd2 < 0) {
@@ -89,6 +92,38 @@ void test_syscalls() {
         printf("Heap Size: %lu bytes\n", stats.heapsize);
         printf("Open Files: %lu\n", stats.openfile_count);
     }
+    // setting resource cap
+    printf("setting resource cap ....");
+    ret = syscall(SYS_resource_cap,pid,11,3);
+    if (ret<0) printf("resource_cap unsuccessful");
+    else if(ret==0) printf("resource cap SUCCESS !!");
+
+    printf("\nWARNING:  trying to exceed resource limit");
+    printf("expanding heap !");
+    old_brk = sbrk(0);
+    if (sbrk(2048 * 1024) == (void *)-1) {  // Expand heap by 128KB
+        perror("sbrk failed");
+        syscall(SYS_deregister, pid);
+        exit(EXIT_FAILURE);
+    }
+    new_brk = sbrk(0);
+    // Increase heap size
+    size_t malloc_size = 128 * 1024; // 128 KB
+    void *ptr = malloc(malloc_size);
+    if (!ptr) {
+        perror("malloc failed");
+        return 1;
+    }
+    printf("Heap expanded by: %ld Bytes\n", (char *)new_brk - (char *)old_brk);
+
+    /* Open one files using open() */
+    printf("\n opening file!");
+    int fd3 = open("/test.txt", O_RDONLY);
+    if (fd3< 0) {
+        perror("open /test.txt failed");
+    } else {
+        printf("Opened /test.txt: fd=%d\n", fd1);
+    }
 
     /* 5. Close the opened files */
     if (fd1 >= 0) {
@@ -99,6 +134,13 @@ void test_syscalls() {
             printf("Closed fd1=%d\n", fd1);
     }
     if (fd2 >= 0) {
+        ret = close(fd2);
+        if (ret < 0)
+            perror("close fd2 failed");
+        else
+            printf("Closed fd2=%d\n", fd2);
+    }
+    if (fd3 >= 0) {
         ret = close(fd2);
         if (ret < 0)
             perror("close fd2 failed");
