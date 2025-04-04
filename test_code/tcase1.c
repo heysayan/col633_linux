@@ -72,15 +72,16 @@ int main() {
         }
         // thread_work(NULL); ; // uncomment this and comment the thread one if not tgid thing implemented 
         printf("THREAD TCASE CHILD\n"); 
-        pthread_t tid;
-        if (pthread_create(&tid, NULL, thread_work, NULL) != 0) {
-        perror("pthread_create");
-        exit(EXIT_FAILURE);
-        }
-        pthread_join(tid, NULL);
+        thread_work(NULL);
+        // pthread_t tid;
+        // if (pthread_create(&tid, NULL, thread_work, NULL) != 0) {
+        // perror("pthread_create");
+        // exit(EXIT_FAILURE);
+        // }
+        // pthread_join(tid, NULL);
 
          // potentially deregister if not automatic 
-         // sys_deregister(my_pid); 
+        sys_deregister(my_pid); 
        
     } else {
         
@@ -115,13 +116,15 @@ int main() {
 
         // comment if tgid not implemented. 
         printf("THREAD TCASE PARENT\n"); 
-        pthread_t tid;
-        if (pthread_create(&tid, NULL, thread_work, NULL) != 0) {
-        perror("pthread_create");
-        exit(EXIT_FAILURE);
-        }
-        pthread_join(tid, NULL);
+        thread_work(NULL);
+        // pthread_t tid;
+        // if (pthread_create(&tid, NULL, thread_work, NULL) != 0) {
+        // perror("pthread_create");
+        // exit(EXIT_FAILURE);
+        // }
+        // pthread_join(tid, NULL);
         
+        sys_deregister(parent_pid); 
         printf("DONE\n"); 
     }
 

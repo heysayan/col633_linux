@@ -2085,10 +2085,20 @@ static __latent_entropy struct task_struct *copy_process(
 
 	retval = -ENOMEM;
 	p = dup_task_struct(current, node);
-	p->heap_quota = current->heap_quota;
-	p->file_quota = current->file_quota;
+
 	if (!p)
 		goto fork_out;
+	// newly added
+	if (clone_flags & CLONE_THREAD){
+		p->heap_quota = current->heap_quota;
+		p->file_quota = current->file_quota;
+	}
+	else{
+		p->heap_quota = -1;
+		p->file_quota = -1;
+	}
+	// end newly added
+	
 	p->flags &= ~PF_KTHREAD;
 	if (args->kthread)
 		p->flags |= PF_KTHREAD;
