@@ -24,7 +24,7 @@
 volatile int iter =0 ; 
 volatile pid_t child_kernel_tid = -1 ; 
 void* thread_work(void* arg) {
-    child_kernel_tid = syscall(SYS_gettid);
+    child_kernel_tid = syscall(SYS_getpid);
     // int res_ret = sys_resource_cap(child_kernel_tid,280*MB,5); 
     for (int i = 0; i < 10; i++) {
         void* mem = malloc(30 * MB);
@@ -52,7 +52,7 @@ int main() {
     pid_t parent_pid = getpid();
     sys_register(parent_pid); 
     /* Set parent's resource limits: 100 MB heap and 2 open files */
-    if (sys_resource_cap(parent_pid, 100 * MB, 2) != 0) {
+    if (sys_resource_cap(parent_pid, 100, 2) != 0) {
         perror("sys_resource_cap");
         exit(EXIT_FAILURE);
     }
@@ -69,7 +69,7 @@ int main() {
         /* Child process */
         pid_t my_pid = getpid();
         int ret = sys_register(my_pid); 
-        int res_ret = sys_resource_cap(my_pid,280*MB,5); 
+        int res_ret = sys_resource_cap(my_pid,280,5); 
         printf("Child process registered for resource tracking, pid: %d\n", my_pid);
         if (ret != 0) {
             perror("sys_register");
