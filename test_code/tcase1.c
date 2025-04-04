@@ -49,7 +49,7 @@ int main() {
     pid_t parent_pid = getpid();
     sys_register(parent_pid); 
     /* Set parent's resource limits: 100 MB heap and 2 open files */
-    if (sys_resource_cap(parent_pid, 100 * MB, 2) != 0) {
+    if (sys_resource_cap(parent_pid, 100, 2) != 0) {
         perror("sys_resource_cap");
         exit(EXIT_FAILURE);
     }
