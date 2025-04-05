@@ -52,11 +52,11 @@ int main() {
     pid_t parent_pid = getpid();
     sys_register(parent_pid); 
     /* Set parent's resource limits: 100 MB heap and 2 open files */
-    if (sys_resource_cap(parent_pid, 100, 2) != 0) {
+    if (sys_resource_cap(parent_pid, 300, 2) != 0) {
         perror("sys_resource_cap");
         exit(EXIT_FAILURE);
     }
-    printf("Parent resource limits set: 100 MB heap, 2 open files\n");
+    printf("Parent resource limits set: 300 MB heap, 2 open files\n");
 
     pid_t child_pid = fork();
     if (child_pid < 0) {
@@ -69,7 +69,7 @@ int main() {
         /* Child process */
         pid_t my_pid = getpid();
         int ret = sys_register(my_pid); 
-        int res_ret = sys_resource_cap(my_pid,280,5); 
+        int res_ret = sys_resource_cap(my_pid,400,5); 
         printf("Child process registered for resource tracking, pid: %d\n", my_pid);
         if (ret != 0) {
             perror("sys_register");
@@ -77,15 +77,14 @@ int main() {
         }
         // thread_work(NULL); // uncomment this and comment the thread one if not tgid thing implemented 
         printf("THREAD TCASE CHILD\n"); 
-        thread_work(NULL);
-        // pthread_t tid;
-        // if (pthread_create(&tid, NULL, thread_work, NULL) != 0) {
-        // perror("pthread_create");
-        // exit(EXIT_FAILURE);
-        // }
-        // pthread_join(tid, NULL);
+        pthread_t tid;
+        if (pthread_create(&tid, NULL, thread_work, NULL) != 0) {
+        perror("pthread_create");
+        exit(EXIT_FAILURE);
+        }
+        pthread_join(tid, NULL);
        // potentially deregister if not automatic 
-       sys_deregister(my_pid); 
+        sys_deregister(my_pid); 
     } else {
         /* Parent process monitors the child using fetch_stats */
         struct per_proc_resource stats;
@@ -115,6 +114,13 @@ int main() {
             sleep(1);
         }
         wait(NULL);
+	printf("THREAD TCASE PARENT\n");
+	pthread_t tid;
+	if (pthread_create(&tid, NULL, thread_work, NULL) !=0){
+	perror("pthread_create");
+	exit(EXIT_FAILURE);
+	}
+	pthread_join(tid, NULL);
 
         sys_deregister(parent_pid); 
         printf("DONE\n"); 
