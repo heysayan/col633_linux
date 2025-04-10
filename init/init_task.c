@@ -210,6 +210,9 @@ struct task_struct init_task
 #ifdef CONFIG_SECCOMP_FILTER
 	.seccomp	= { .filter_count = ATOMIC_INIT(0) },
 #endif
+	// COL633 assgn2 functionalities
+	.gangid = -1
+	//end COL633
 };
 EXPORT_SYMBOL(init_task);
 

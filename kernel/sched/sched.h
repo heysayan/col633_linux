@@ -196,10 +196,21 @@ static inline int dl_policy(int policy)
 {
 	return policy == SCHED_DEADLINE;
 }
+
+// COL633 added
+static inline int gang_policy(int policy)
+{
+	return policy == SCHED_GANG;
+}
+static inline int task_has_gang_policy(struct task_struct *p)
+{
+	return gang_policy(p->policy);
+}
+// end COL633
 static inline bool valid_policy(int policy)
 {
 	return idle_policy(policy) || fair_policy(policy) ||
-		rt_policy(policy) || dl_policy(policy);
+		rt_policy(policy) || dl_policy(policy) || gang_policy(policy);
 }
 
 static inline int task_has_idle_policy(struct task_struct *p)
@@ -2248,6 +2259,9 @@ extern struct sched_class __sched_class_lowest[];
 extern const struct sched_class stop_sched_class;
 extern const struct sched_class dl_sched_class;
 extern const struct sched_class rt_sched_class;
+// COL633 added
+extern const struct sched_class gang_sched_class;
+// end COL633
 extern const struct sched_class fair_sched_class;
 extern const struct sched_class idle_sched_class;
 

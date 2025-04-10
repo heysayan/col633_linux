@@ -1279,6 +1279,13 @@ asmlinkage long sys_ni_syscall(void);
 #endif /* CONFIG_ARCH_HAS_SYSCALL_WRAPPER */
 
 
+// COL633 assgn2 functionalities
+asmlinkage long sys_register_gang(pid_t pid,int gang_id, int exec_time);
+asmlinkage long sys_exit_gang(pid_t pid);
+asmlinkage long sys_list(int gang_id, pid_t *pids);
+
+
+
 /*
  * Kernel code should not call syscalls (i.e., sys_xyzyyz()) directly.
  * Instead, use one of the functions which work equivalently, such as

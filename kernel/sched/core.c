@@ -9635,7 +9635,8 @@ void __init sched_init(void)
 
 	/* Make sure the linker didn't screw up */
 	BUG_ON(&idle_sched_class != &fair_sched_class + 1 ||
-	       &fair_sched_class != &rt_sched_class + 1 ||
+	       &fair_sched_class != &gang_sched_class + 1 ||
+		   &gang_sched_class != &rt_sched_class + 1 ||	// COL633 assgn2 added
 	       &rt_sched_class   != &dl_sched_class + 1);
 #ifdef CONFIG_SMP
 	BUG_ON(&dl_sched_class != &stop_sched_class + 1);

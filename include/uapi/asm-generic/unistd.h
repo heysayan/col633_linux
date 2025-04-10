@@ -886,8 +886,20 @@ __SYSCALL(__NR_futex_waitv, sys_futex_waitv)
 #define __NR_set_mempolicy_home_node 450
 __SYSCALL(__NR_set_mempolicy_home_node, sys_set_mempolicy_home_node)
 
+
+// COL633 assgn2 functionalities
+#define __NR_register_gang 451
+__SYSCALL(__NR_register_gang, sys_register_gang)
+
+#define __NR_exit_gang 452
+__SYSCALL(__NR_exit_gang, sys_exit_gang)
+
+#define __NR_list 453
+__SYSCALL(__NR_list, sys_list)
+
+
 #undef __NR_syscalls
-#define __NR_syscalls 451
+#define __NR_syscalls 454
 
 /*
  * 32 bit systems traditionally used different

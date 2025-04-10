@@ -76,6 +76,12 @@
 
 #include "uid16.h"
 
+// COL633 added
+#include <linux/types.h>
+#include <linux/gang.h>
+#include <linux/spinlock.h>
+#include <linux/cpumask.h>
+
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
 #endif
@@ -2791,3 +2797,143 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	return 0;
 }
 #endif /* CONFIG_COMPAT */
+
+
+
+
+// COL633 assgn2 functionalities
+
+LIST_HEAD(gangs);
+DEFINE_SPINLOCK(gang_lock);
+
+SYSCALL_DEFINE3(register_gang, pid_t, pid, int, gangid, int, exec_time){
+	struct gang *g = NULL;
+	struct gang *gcur;
+	struct gang_task *gt;
+	struct task_struct *p;
+
+	// traversing the gangs list to find the gang
+    list_for_each_entry(gcur, &gangs, gang_node) {
+        if (gcur->gangid == gangid){ //gang found
+			// checking if num of cpus is enough
+			if (gcur->size >= num_online_cpus() ) 
+				return -22;
+			g = gcur;
+            break;
+		}
+    }
+
+	// figuring out task_struct and checking if it exists
+	rcu_read_lock();
+	p = find_task_by_vpid(pid);
+	if (!p) {
+		rcu_read_unlock();
+		return -ESRCH;
+	}
+	else{ //creating gang_task object
+		rcu_read_unlock();
+		gt = kmalloc(sizeof(struct gang_task), GFP_KERNEL);
+		if (!gt)
+			return -ENOMEM;
+		gt->task = p;
+		gt->exec_time = exec_time;
+		//INIT_LIST_HEAD(&gt->list);
+	}
+
+
+
+	if (!g) {	// new gang
+
+		// creating new gang and new gang_task
+		g = kmalloc(sizeof(struct gang), GFP_KERNEL);
+		if (!g) {
+			kfree(gt);
+			return -ENOMEM;
+		}
+		g->gangid = gangid;
+		g->size = 1;
+		g->start_jiffies = 0;
+		g->running = 0;
+		INIT_LIST_HEAD(&g->task_list);		
+		list_add(&g->gang_node, &gangs);
+	}
+	else 	// gang already exists
+		g->size++;
+
+	list_add(&gt->list, &g->task_list);
+	return 0;
+	
+}
+
+
+SYSCALL_DEFINE1(exit_gang, pid_t, pid){
+	struct gang *g = NULL;
+	struct gang *gcur;
+	struct gang_task *gt;
+	struct task_struct *p;
+	// figuring out task_struct and checking if it exists
+	rcu_read_lock();
+	p = find_task_by_vpid(pid);
+	if (!p) {
+		rcu_read_unlock();
+		return -22;
+	}
+	rcu_read_unlock();
+	if (p->gangid < 0)
+		return -22;
+	
+
+	// traversing the gangs list to find the gang
+    list_for_each_entry(gcur, &gangs, gang_node) {
+        if (gcur->gangid == p->gangid){ //gang found
+			g = gcur;
+			// traversing the gang's task list to find the task
+			list_for_each_entry(gt, &g->task_list, list) {
+				if (gt->task == p) { //task found
+					list_del(&gt->list); // remove task from gang
+					kfree(gt); // free task
+					p->gangid = -1; // set task's gangid to -1
+					g->size--; // decrease size of gang
+					if (g->size == 0) { // if gang is empty
+						list_del(&g->gang_node); // remove gang from list
+						kfree(g); // free gang
+					}
+					break;
+				}
+			}
+            break;
+		}
+    }
+	// if gang not found
+	if (!g)
+		return -22;
+
+	return 0;
+}
+
+SYSCALL_DEFINE2(list, int, gangid, pid_t __user *, pids){
+	struct gang *g = NULL;
+	struct gang *gcur;
+	struct gang_task *gt;
+	int i = 0;
+
+	// traversing the gangs list to find the gang
+	list_for_each_entry(gcur, &gangs, gang_node) {
+		if (gcur->gangid == gangid){ //gang found
+			g = gcur;
+			break;
+		}
+	}
+
+	// if gang not found
+	if (!g)
+		return -22;
+
+	// traversing the gang's task list to find the task
+	list_for_each_entry(gt, &g->task_list, list) {
+		if (copy_to_user(&pids[i], &gt->task->pid, sizeof(pid_t)))
+			return -22;
+		i++;
+	}
+	return 0;
+}
