@@ -16,3 +16,12 @@ several of them using the Restructured Text markup notation.
 Please read the Documentation/process/changes.rst file, as it contains the
 requirements for building and running the kernel, and information about
 the problems which may result by upgrading your kernel.
+
+
+Chnages to kernel
+==============
+
+Added Resource Monitoring and Limiting capability. Done this way, designed and implemented data structures for storing open files count and heap usage for each registered process,
+where users register or deregister processes for tracking, user can fetch open files count and heap usage of each registered process, define heap usage and open files count limits for
+registered processes, using newly defined system calls (register,deregister,fetch, resource_cap, resource_reset) and to update and enforce limit, hooks at following system calls are added:
+brk, mmap, open, close.
